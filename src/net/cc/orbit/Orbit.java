@@ -8,29 +8,6 @@ import java.util.Map;
 import net.cc.universe.Mass;
 
 public class Orbit {
-	public static void main(String[] args) {
-		int steps = 360;
-		Mass earth = new Mass(1.0,3.9078);
-		Mass sun = new Mass(333055.0,1.0);
-		Orbit orbit = new Orbit(earth, sun, 2.0, 10.0, steps);
-		DecimalFormat df = new DecimalFormat("#.######");
-		System.out.println(orbit);
-		for (int i = 0; i < steps; i++) {
-			System.out.print(df.format(orbit.getTime()[i]));
-			System.out.print("\t");
-			System.out.print(df.format(orbit.getMeanAnomaly()[i]));
-			System.out.print("\t");
-			System.out.print(df.format(orbit.getEccentricAnomaly()[i]));
-			System.out.print("\t");
-			System.out.print(df.format(orbit.getTrueAnomaly()[i]));
-			System.out.print("\t");
-			System.out.print(df.format(orbit.getParticleX()[i]));
-			System.out.print("\t");
-			System.out.print(df.format(orbit.getParticleY()[i]));
-			System.out.println();
-		}
-	}
-	
 	private final static int SIG_FIGS = 5;
 	
 	private final static double ACCURACY = Math.pow(10, SIG_FIGS * -1);
@@ -64,8 +41,10 @@ public class Orbit {
 	private final double[] particleMeanX;
 
 	private final double[] particleMeanY;
+	
+	private double centerX, centerY, perapsisArgument;
 
-	public Orbit(Mass focus, Mass particle, double perapsis, double apoapsis, int steps) {
+	public Orbit(Mass focus, Mass particle, double perapsis, double apoapsis, double perapsisArgument, int steps) {
 		super();
 		this.focus = focus;
 		this.particle = particle;
@@ -82,6 +61,7 @@ public class Orbit {
 		this.particleMeanX = new double[steps];
 		this.particleMeanY = new double[steps];
 		this.eccentricy = (apoapsis - perapsis) / (apoapsis + perapsis);
+		this.perapsisArgument = perapsisArgument;
 		generateTime();
 		generateMeanAnomaly();
 		generateEccentricAnomaly();
@@ -91,6 +71,17 @@ public class Orbit {
 		generateMeanPositionX();
 		generateMeanPositionY();
 		generateVelocity();
+		generateCenter();
+		translatePositions();
+	}
+
+	private void generateCenter() {
+		double K = Math.PI / 180.0;
+		double A = this.perapsis / (1 - this.eccentricy);
+		double T = 90 * K;
+		double C = Math.cos(T);
+		this.centerX = A * (C - this.eccentricy);
+		this.centerY = 0;
 	}
 
 	private void generateTime() {
@@ -105,6 +96,9 @@ public class Orbit {
 		}
 	}
 
+	/**
+	 * http://www.jgiesen.de/kepler/kepler.html
+	 */
 	private void generateEccentricAnomaly() {
 		for (int i = 0; i < steps; i++) {
 			double pi = Math.PI;
@@ -137,6 +131,9 @@ public class Orbit {
 		}
 	}
 
+	/**
+	 * http://www.jgiesen.de/kepler/kepler.html
+	 */
 	private void generateTrueAnomaly() {
 		for (int i = 0; i < steps; i++) {
 			double K = Math.PI / 180.0;
@@ -151,25 +148,48 @@ public class Orbit {
 		}
 	}
 
+	/**
+	 * http://www.jgiesen.de/kepler/kepler.html
+	 */
 	private void generatePositionX() {
 		for (int i = 0; i < steps; i++) {
 			double K = Math.PI / 180.0;
 			
-			double T = this.eccentricAnomaly[i] * K;
-			
 			double A = this.perapsis / (1 - this.eccentricy);
+			
+			double T = this.trueAnomaly[i] * K;
 			
 			double C = Math.cos(T);
 			
 			this.particleX[i] = A * (C - this.eccentricy);
 		}
 	}
+	
+	/**
+	 * https://en.wikipedia.org/wiki/Transformation_matrix
+	 */
+	private void translatePositions() {
+		double K = Math.PI / 180.0;
+		double pa = this.perapsisArgument * K;
+		for (int i = 0; i < steps; i++) {
+			double x = this.particleX[i];
+			double y = this.particleY[i];
+			double xMean = this.particleMeanX[i];
+			double yMean = this.particleMeanY[i];
+			this.particleX[i] = x * Math.cos(pa) + y * Math.sin(pa);
+			this.particleY[i] = y * Math.cos(pa) - x * Math.sin(pa);
+			this.particleMeanX[i] = xMean * Math.cos(pa) + yMean * Math.sin(pa);
+			this.particleMeanY[i] = yMean * Math.cos(pa) - xMean * Math.sin(pa);
+		}
+		this.centerX = this.centerX * Math.cos(pa) + this.centerY * Math.sin(pa);
+		this.centerY = this.centerY * Math.cos(pa) - this.centerX * Math.sin(pa);
+	}
 
 	private void generatePositionY() {
 		for (int i = 0; i < steps; i++) {
 			double K = Math.PI / 180.0;
 			
-			double T = this.eccentricAnomaly[i] * K;
+			double T = this.trueAnomaly[i] * K;
 			
 			double A = this.perapsis / (1 - this.eccentricy);
 			
@@ -185,9 +205,9 @@ public class Orbit {
 		for (int i = 0; i < steps; i++) {
 			double K = Math.PI / 180.0;
 			
-			double T = this.eccentricAnomaly[i] * K - 180.0;
-			
 			double A = this.perapsis / (1 - this.eccentricy);
+			
+			double T = this.meanAnomaly[i] * K;
 			
 			double C = Math.cos(T);
 			
@@ -199,15 +219,13 @@ public class Orbit {
 		for (int i = 0; i < steps; i++) {
 			double K = Math.PI / 180.0;
 			
-			double T = this.eccentricAnomaly[i] * K - 180.0;
-			
 			double A = this.perapsis / (1 - this.eccentricy);
 			
-			double F = Math.sqrt(1.0 - this.eccentricy * this.eccentricy);
+			double T = this.meanAnomaly[i] * K;
 			
 			double S = Math.sin(T);
 			
-			this.particleMeanY[i] = A * F * S;
+			this.particleMeanY[i] = A * S ;
 		}
 	}
 
@@ -245,6 +263,50 @@ public class Orbit {
 
 	public double[] getParticleMeanY() {
 		return particleMeanY;
+	}
+
+	public double getEccentricy() {
+		return eccentricy;
+	}
+
+	public void setEccentricy(double eccentricy) {
+		this.eccentricy = eccentricy;
+	}
+
+	public double getSemiMajor() {
+		return semiMajor;
+	}
+
+	public void setSemiMajor(double semiMajor) {
+		this.semiMajor = semiMajor;
+	}
+
+	public double getApoapsis() {
+		return apoapsis;
+	}
+
+	public void setApoapsis(double apoapsis) {
+		this.apoapsis = apoapsis;
+	}
+
+	public double getPerapsis() {
+		return perapsis;
+	}
+
+	public void setPerapsis(double perapsis) {
+		this.perapsis = perapsis;
+	}
+
+	public int getSteps() {
+		return steps;
+	}
+
+	public double getCenterX() {
+		return centerX;
+	}
+
+	public double getCenterY() {
+		return centerY;
 	}
 
 	@Override
