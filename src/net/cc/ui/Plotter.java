@@ -53,6 +53,8 @@ public class Plotter extends JFrame implements ChangeListener, ActionListener, K
 
 	private final ChartPanel anomalyChartPanel;
 
+	private final ChartPanel velocityChartPanel;
+
 	private final JTextField minAU, maxAU, steps;
 
 	private final JSlider apoapsis, perapsis, time, perapsisArgument;
@@ -70,7 +72,7 @@ public class Plotter extends JFrame implements ChangeListener, ActionListener, K
 		JPanel controlPanel = new JPanel(new GridLayout(1, 5));
 		this.minAU = new JTextField("1.0");
 		this.maxAU = new JTextField("100.0");
-		this.steps = new JTextField("200");
+		this.steps = new JTextField("360");
 		this.update = new JButton("Update");
 		controlPanel.add(this.minAU);
 		controlPanel.add(this.maxAU);
@@ -119,10 +121,19 @@ public class Plotter extends JFrame implements ChangeListener, ActionListener, K
 		this.orbitChartPanel.setPreferredSize(new Dimension(500, 500));
 		this.add(this.orbitChartPanel, BorderLayout.NORTH);
 
+		JPanel subChartPanel = new JPanel(new GridLayout(1,2));
+
 		this.anomalyChartPanel = new ChartPanel(null);
 		this.anomalyChartPanel.addMouseWheelListener(this);
 		this.anomalyChartPanel.setPreferredSize(new Dimension(500, 250));
-		this.add(this.anomalyChartPanel, BorderLayout.CENTER);
+		subChartPanel.add(this.anomalyChartPanel);
+		
+		this.velocityChartPanel = new ChartPanel(null);
+		this.velocityChartPanel.addMouseWheelListener(this);
+		this.velocityChartPanel.setPreferredSize(new Dimension(500, 250));
+		subChartPanel.add(this.velocityChartPanel);
+		
+		this.add(subChartPanel, BorderLayout.CENTER);
 
 		southPanel.add(controlPanel, BorderLayout.NORTH);
 		southPanel.add(sliderPanel, BorderLayout.CENTER);
@@ -241,6 +252,10 @@ public class Plotter extends JFrame implements ChangeListener, ActionListener, K
 				console.append(df.format(orbit.getParticleMeanX()[i]));
 				console.append("\t");
 				console.append(df.format(orbit.getParticleMeanY()[i]));
+				console.append("\t");
+				console.append(df.format(orbit.getVelocityX()[i]));
+				console.append("\t");
+				console.append(df.format(orbit.getVelocityY()[i]));
 				console.append("\n");
 			}
 			console.append(orbit.toString() + "\n");
@@ -248,9 +263,49 @@ public class Plotter extends JFrame implements ChangeListener, ActionListener, K
 			this.orbitChartPanel.setChart(getOrbitChart(steps, orbit, (int)time));
 
 			this.anomalyChartPanel.setChart(getAnomalyChart(steps, orbit));
+
+			this.velocityChartPanel.setChart(getVelocityChart(steps, orbit));
 		} catch (Exception x) {
 			x.printStackTrace();
 		}
+	}
+	
+	public JFreeChart getVelocityChart(int steps, Orbit orbit) {
+		XYSeriesCollection dataset = new XYSeriesCollection();
+		XYSeries xSeries = new XYSeries("Velocity X");
+		XYSeries ySeries = new XYSeries("Velocity Y");
+
+		for (int i = 1; i < steps; i++) {
+			xSeries.add(orbit.getTime()[i], orbit.getVelocityX()[i]);
+		}
+		for (int i = 1; i < steps; i++) {
+			ySeries.add(orbit.getTime()[i], orbit.getVelocityY()[i]);
+		}
+		
+		dataset.addSeries(xSeries);
+		dataset.addSeries(ySeries);
+
+		String chartTitle = "Velocity Plot";
+		String xAxisLabel = "T (In units of Time)";
+		String yAxisLabel = "Velocity";
+
+		JFreeChart chart = ChartFactory.createScatterPlot(chartTitle, xAxisLabel, yAxisLabel, (XYDataset) dataset);
+
+		XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer();
+
+		// sets paint color for each series
+		renderer.setSeriesShape(0, new Ellipse2D.Double(-0.5, -0.5, 1, 1));
+		renderer.setSeriesPaint(0, Color.RED);
+		renderer.setSeriesStroke(0, new BasicStroke(1.0f));
+		renderer.setSeriesShape(1, new Ellipse2D.Double(-0.5, -0.5, 1, 1));
+		renderer.setSeriesPaint(1, Color.GREEN);
+		renderer.setSeriesStroke(1, new BasicStroke(1.0f));
+		renderer.setSeriesShape(2, new Ellipse2D.Double(-0.5, -0.5, 1, 1));
+		renderer.setSeriesPaint(2, Color.YELLOW);
+		renderer.setSeriesStroke(2, new BasicStroke(1.0f));
+		chart.getXYPlot().setRenderer(renderer);
+
+		return chart;
 	}
 
 	public JFreeChart getAnomalyChart(int steps, Orbit orbit) {

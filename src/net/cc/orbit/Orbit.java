@@ -32,7 +32,9 @@ public class Orbit {
 	
 	private final double[] eccentricAnomaly;
 	
-	private final double[] velocity;
+	private final double[] velocityX;
+	
+	private final double[] velocityY;
 	
 	private final double[] particleX;
 	
@@ -55,7 +57,8 @@ public class Orbit {
 		this.meanAnomaly = new double[steps];
 		this.eccentricAnomaly = new double[steps];
 		this.trueAnomaly = new double[steps];
-		this.velocity = new double[steps];
+		this.velocityX = new double[steps];
+		this.velocityY = new double[steps];
 		this.particleX = new double[steps];
 		this.particleY = new double[steps];
 		this.particleMeanX = new double[steps];
@@ -176,10 +179,14 @@ public class Orbit {
 			double y = this.particleY[i];
 			double xMean = this.particleMeanX[i];
 			double yMean = this.particleMeanY[i];
+			double xVelocity = this.velocityX[i];
+			double yVelocity = this.velocityY[i];
 			this.particleX[i] = x * Math.cos(pa) + y * Math.sin(pa);
 			this.particleY[i] = y * Math.cos(pa) - x * Math.sin(pa);
 			this.particleMeanX[i] = xMean * Math.cos(pa) + yMean * Math.sin(pa);
 			this.particleMeanY[i] = yMean * Math.cos(pa) - xMean * Math.sin(pa);
+			this.velocityX[i] = xVelocity * Math.cos(pa) + yVelocity * Math.sin(pa);
+			this.velocityY[i] = yVelocity * Math.cos(pa) - xVelocity * Math.sin(pa);
 		}
 		this.centerX = this.centerX * Math.cos(pa) + this.centerY * Math.sin(pa);
 		this.centerY = this.centerY * Math.cos(pa) - this.centerX * Math.sin(pa);
@@ -230,7 +237,23 @@ public class Orbit {
 	}
 
 	private void generateVelocity() {
+		for (int i = 0; i < steps; i++) {
+			double K = Math.PI / 180.0;
+			
+			double A = this.perapsis / (1 - this.eccentricy);
+			
+			double M = this.meanAnomaly[i] * K;
+			
+			double C = Math.cos(M);
+			
+			double S = Math.sin(M);
+			
+			if (this.meanAnomaly[i] != 90 && this.meanAnomaly[i] != 270)
+				this.velocityX[i] = Math.signum(C) * Math.sqrt(A / (Math.abs(C) * A * (1.0 - this.eccentricy * this.eccentricy)));
 
+			if (this.meanAnomaly[i] != 0 && this.meanAnomaly[i] != 180)
+				this.velocityY[i] = Math.signum(S) * Math.sqrt(A / (Math.abs(S) * A * (1.0 - this.eccentricy * this.eccentricy)));
+		}
 	}
 
 	public int[] getTime() {
@@ -263,6 +286,14 @@ public class Orbit {
 
 	public double[] getParticleMeanY() {
 		return particleMeanY;
+	}
+
+	public double[] getVelocityX() {
+		return velocityX;
+	}
+
+	public double[] getVelocityY() {
+		return velocityY;
 	}
 
 	public double getEccentricy() {
